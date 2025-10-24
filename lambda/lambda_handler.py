@@ -17,6 +17,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     http_method = event.get('httpMethod', event.get('requestContext', {}).get('http', {}).get('method', ''))
     path = event.get('path', event.get('rawPath', ''))
     
+    if path.startswith('/prod/'):
+        path = path[5:]
+    elif path.startswith('/'):
+        path = path
+    
     if path == '/health' and http_method == 'GET':
         return health_handler(event, context)
     elif path == '/notify' and http_method == 'POST':
