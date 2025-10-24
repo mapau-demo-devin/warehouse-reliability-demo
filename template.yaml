@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Warehouse Reliability Notification Service - Lambda Migration
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.12
+    Environment:
+      Variables:
+        DYNAMODB_TABLE: !Ref AlertsTable
+        AWS_SES_REGION: !Ref AWS::Region
+        SES_SENDER_EMAIL: !Ref SenderEmail
+        TWILIO_ACCOUNT_SID: !Ref TwilioAccountSid
+        TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
+        TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
+
+Parameters:
+  SenderEmail:
+    Type: String
+    Default: alerts@warehouse-ops.com
+    Description: Email address for sending SES notifications
+  
+  TwilioAccountSid:
+    Type: String
+    Default: ''
+    Description: Twilio Account SID (leave empty for mock mode)
+    NoEcho: true
+  
+  TwilioAuthToken:
+    Type: String
+    Default: ''
+    Description: Twilio Auth Token (leave empty for mock mode)
+    NoEcho: true
+  
+  TwilioPhoneNumber:
+    Type: String
+    Default: ''
+    Description: Twilio phone number (leave empty for mock mode)
+
+Resources:
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: lambda_handler.lambda_handler
+      Description: Warehouse notification service Lambda function
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AlertsTable
+        - Statement:
+          - Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource: '*'
+      Events:
+        NotifyApi:
+          Type: HttpApi
+          Properties:
+            Path: /notify
+            Method: POST
+            ApiId: !Ref NotificationApi
+        HealthApi:
+          Type: HttpApi
+          Properties:
+            Path: /health
+            Method: GET
+            ApiId: !Ref NotificationApi
+        AlertsApi:
+          Type: HttpApi
+          Properties:
+            Path: /alerts
+            Method: GET
+            ApiId: !Ref NotificationApi
+
+  NotificationApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - Content-Type
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+
+  AlertsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: warehouse-alerts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+        - AttributeName: system
+          AttributeType: S
+        - AttributeName: severity
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: system-timestamp-index
+          KeySchema:
+            - AttributeName: system
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: severity-timestamp-index
+          KeySchema:
+            - AttributeName: severity
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Application
+          Value: WarehouseNotificationService
+        - Key: Environment
+          Value: Production
+
+Outputs:
+  NotificationApiUrl:
+    Description: API Gateway endpoint URL for Notification Service
+    Value: !Sub 'https://${NotificationApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
+  
+  NotificationFunctionArn:
+    Description: Notification Lambda Function ARN
+    Value: !GetAtt NotificationFunction.Arn
+  
+  AlertsTableName:
+    Description: DynamoDB table name for alerts
+    Value: !Ref AlertsTable
+  
+  AlertsTableArn:
+    Description: DynamoDB table ARN
+    Value: !GetAtt AlertsTable.Arn

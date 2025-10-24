@@ -1,6 +1,21 @@
 # Warehouse Reliability Notification Service
 
-An on-premise web notification service designed for large consumer goods companies (like PepsiCo) to notify warehouse staff when critical supply chain systems experience downtime.
+A web notification service designed for large consumer goods companies (like PepsiCo) to notify warehouse staff when critical supply chain systems experience downtime.
+
+## Deployment Options
+
+This service supports two deployment modes:
+
+1. **AWS Lambda (Recommended)** - Serverless deployment with automatic scaling
+   - See [LAMBDA_DEPLOYMENT.md](LAMBDA_DEPLOYMENT.md) for complete deployment guide
+   - Uses DynamoDB for alert storage
+   - Deployed via AWS SAM
+   - Pay-per-use pricing (~$1-2/month for typical usage)
+
+2. **On-Premise Flask** - Traditional server deployment
+   - See instructions below for local/on-premise setup
+   - Uses SQLite for alert storage
+   - Requires server maintenance
 
 ## Overview
 
@@ -12,16 +27,18 @@ This service provides real-time notifications to warehouse operations teams when
 - **Multi-channel Support**: Send alerts via Email (AWS SES) or SMS (Twilio)
 - **System Monitoring**: Track alerts for WMS, ERP, and InventoryService
 - **Severity Levels**: Categorize alerts as critical, warning, or info
-- **Alert Logging**: Store all alert metadata in SQLite database
+- **Alert Logging**: Store all alert metadata (SQLite for Flask, DynamoDB for Lambda)
 - **Error Handling**: Comprehensive logging and error handling
-- **Lambda-Ready**: Structured for easy migration to AWS Lambda + API Gateway
+- **Serverless Ready**: Full AWS Lambda implementation available
 
-## Requirements
+## On-Premise Flask Deployment
+
+### Requirements
 
 - Python 3.8+
 - pip (Python package manager)
 
-## Installation
+### Installation
 
 1. Clone the repository:
 ```bash
@@ -61,7 +78,7 @@ PORT=5000
 
 **Note**: If AWS or Twilio credentials are not provided, the service will run in mock mode and log notifications to the console instead of actually sending them.
 
-## Running the Service
+### Running the Service
 
 Start the Flask server:
 ```bash
@@ -296,28 +313,20 @@ pytest test_app.py -v
 
 ## Architecture
 
-The service is designed to run on-premise but is structured for easy migration to serverless:
+This service supports two deployment architectures:
 
-**Current (On-Premise)**:
+**On-Premise (Flask)**:
 - Flask web server
 - SQLite database
 - Direct AWS SES and Twilio API calls
+- Manual scaling and maintenance
 
-**Future (Serverless)**:
-- AWS Lambda function (minimal code changes needed)
+**Serverless (AWS Lambda)**:
+- AWS Lambda function
 - API Gateway for REST endpoint
 - DynamoDB for alert storage
-- Same notification logic
-
-### Migration Path to AWS Lambda
-
-1. Extract the notification logic into separate handler functions
-2. Replace Flask routes with Lambda handler
-3. Swap SQLite for DynamoDB
-4. Deploy using AWS SAM or Serverless Framework
-5. Configure API Gateway to trigger Lambda
-
-The current code structure minimizes the refactoring needed for this migration.
+- Automatic scaling and high availability
+- See [LAMBDA_DEPLOYMENT.md](LAMBDA_DEPLOYMENT.md) for deployment instructions
 
 ## Use Case
 
